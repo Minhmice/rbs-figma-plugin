@@ -10,10 +10,10 @@ Search Magnific from Figma, prefer real SVG, convert EPS → SVG locally, insert
 
 2. Designer imports `manifest.json` once through **Figma Desktop → Plugins → Development → Import plugin from manifest...**.
 3. Designer double-clicks `MagnificStock.exe`; it runs in the system tray and starts local server.
-4. Designer opens Chrome and logs in to `magnific.com`.
+4. Designer opens any Chrome profile and logs in to `magnific.com`.
 5. Designer runs **Magnific Stock** in Figma.
 6. Open **Settings → Show advanced settings → Connect Magnific**.
-7. Close Chrome when prompted, wait for **Magnific connected**, then reopen Chrome.
+7. Close Chrome when prompted, wait for **Magnific connected**, then reopen Chrome. All Chrome profiles with Magnific cookies are imported.
 
 Figma does not expose supported API for EXE to auto-import local plugin manifest. For zero-manual-install distribution, publish plugin as a private organization plugin; designers install it from Figma once. No Chrome extension, terminal, `npm`, Proxy URL, or CDP command needed for designer.
 

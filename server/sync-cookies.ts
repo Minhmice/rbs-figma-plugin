@@ -2,16 +2,18 @@
  * Sync Magnific cookies from Chrome via CDP.
  * Uses a copied profile dir (Chrome 136+ blocks CDP on the default User Data path).
  */
-import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
+import { mkdir, writeFile, readdir, readFile, unlink } from "node:fs/promises";
 import { existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { spawn, execSync } from "node:child_process";
+import { createServer } from "node:net";
 import CDP from "chrome-remote-interface";
 import { appDataPath } from "./runtime-path.js";
 
 export const cookiesDir = appDataPath("cookies");
-const PORT = Number(process.env.CHROME_CDP_PORT || 9222);
 const CDP_USER_DATA = join(process.env.LOCALAPPDATA || "", "MagnificPluginChromeCDP");
+const CHROME_PROFILE_ID_PREFIX = "chrome-";
+const CHROME_USER_DATA = join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
 const HOST_FILTER = /magnific\.com|freepik\.com|flaticon\.com/i;
 
 export type CookieJar = {
@@ -23,6 +25,12 @@ export type CookieJar = {
   cookie: string;
   updatedAt: string;
   cookieCount: number;
+};
+
+type ChromeProfile = {
+  directory: string;
+  email?: string;
+  name?: string;
 };
 
 function chromePath(): string {
@@ -47,65 +55,92 @@ function chromeRunning(): boolean {
   }
 }
 
-async function cdpReachable(): Promise<boolean> {
+async function cdpReachable(port: number): Promise<boolean> {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/json/version`);
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
     return res.ok;
   } catch {
     return false;
   }
 }
 
-function syncProfileCopy(): void {
-  const srcRoot = join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
-  const srcDefault = join(srcRoot, "Default");
-  if (!existsSync(srcDefault)) throw new Error("Chrome Default profile not found");
+async function freePort(): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const server = createServer();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      server.close((err) => (err ? reject(err) : resolve(port)));
+    });
+  });
+}
 
-  mkdirSync(CDP_USER_DATA, { recursive: true });
-  // Fresh copy of Local State + Default (cookies need Chrome closed)
-  const dstDefault = join(CDP_USER_DATA, "Default");
+async function readChromeProfiles(): Promise<ChromeProfile[]> {
+  const localStatePath = join(CHROME_USER_DATA, "Local State");
+  if (!existsSync(localStatePath)) throw new Error("Chrome User Data not found");
+  const profiles = new Map<string, ChromeProfile>();
   try {
-    execSync(
-      `robocopy "${srcDefault}" "${dstDefault}" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /XD Cache "Code Cache" GPUCache "Service Worker" "DawnCache" "GrShaderCache" "ShaderCache"`,
-      { stdio: "ignore" }
-    );
-  } catch (err) {
-    // robocopy: exit codes 0-7 = success
-    const status = (err as { status?: number }).status ?? 1;
-    if (status >= 8) throw err;
+    const local = JSON.parse(await readFile(localStatePath, "utf8")) as {
+      profile?: {
+        info_cache?: Record<string, { user_name?: string; name?: string }>;
+      };
+    };
+    for (const [directory, info] of Object.entries(local.profile?.info_cache || {})) {
+      if (directory === "Default" || /^Profile \d+$/.test(directory)) {
+        profiles.set(directory, { directory, email: info.user_name, name: info.name });
+      }
+    }
+  } catch {
+    /* folder scan below remains authoritative */
   }
-  // robocopy exit codes 0-7 are success
+  const names = await readdir(CHROME_USER_DATA, { withFileTypes: true });
+  for (const entry of names) {
+    if (
+      entry.isDirectory() &&
+      (entry.name === "Default" || /^Profile \d+$/.test(entry.name)) &&
+      !profiles.has(entry.name)
+    ) {
+      profiles.set(entry.name, { directory: entry.name });
+    }
+  }
+  return [...profiles.values()].sort((a, b) => a.directory.localeCompare(b.directory));
+}
+
+function syncProfileCopy(profiles: ChromeProfile[]): void {
+  mkdirSync(CDP_USER_DATA, { recursive: true });
+  // Fresh copy of Local State + all profiles (cookies need Chrome closed).
+  for (const { directory } of profiles) {
+    const srcProfile = join(CHROME_USER_DATA, directory);
+    const dstProfile = join(CDP_USER_DATA, directory);
+    try {
+      execSync(
+        `robocopy "${srcProfile}" "${dstProfile}" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /XD Cache "Code Cache" GPUCache "Service Worker" "DawnCache" "GrShaderCache" "ShaderCache"`,
+        { stdio: "ignore" }
+      );
+    } catch (err) {
+      // robocopy: exit codes 0-7 = success
+      const status = (err as { status?: number }).status ?? 1;
+      if (status >= 8) throw err;
+    }
+  }
   for (const name of ["Local State", "Local State.bak"]) {
-    const s = join(srcRoot, name);
-    if (existsSync(s)) {
-      execSync(`cmd /c copy /Y "${s}" "${join(CDP_USER_DATA, name)}"`, { stdio: "ignore" });
+    const source = join(CHROME_USER_DATA, name);
+    if (existsSync(source)) {
+      execSync(`cmd /c copy /Y "${source}" "${join(CDP_USER_DATA, name)}"`, { stdio: "ignore" });
     }
   }
 }
 
-async function ensureChromeDebugging(): Promise<void> {
-  if (await cdpReachable()) {
-    // Ensure it's OUR cdp profile — still ok to reuse
-    return;
-  }
-
-  console.log("Preparing Chrome CDP profile copy...");
-  if (chromeRunning()) {
-    throw new Error(
-      "Chrome is running. Close Chrome yourself before fallback CDP sync; extension auto-sync avoids this."
-    );
-  }
-
-  syncProfileCopy();
-
-  console.log(`Starting Chrome CDP on port ${PORT}...`);
+async function launchChromeProfile(profile: ChromeProfile, port: number): Promise<void> {
+  console.log(`Starting Chrome CDP for ${profile.directory} on port ${port}...`);
   spawn(
     chromePath(),
     [
-      `--remote-debugging-port=${PORT}`,
-      `--remote-allow-origins=*`,
+      `--remote-debugging-port=${port}`,
+      "--remote-allow-origins=*",
       `--user-data-dir=${CDP_USER_DATA}`,
-      "--profile-directory=Default",
+      `--profile-directory=${profile.directory}`,
       "--no-first-run",
       "--no-default-browser-check",
       "https://www.magnific.com/",
@@ -115,14 +150,27 @@ async function ensureChromeDebugging(): Promise<void> {
 
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    if (await cdpReachable()) {
-      console.log("CDP ready");
-      // Give Magnific a moment to settle cookies
+    if (await cdpReachable(port)) {
       await new Promise((r) => setTimeout(r, 2000));
       return;
     }
   }
-  throw new Error(`Chrome CDP not reachable on port ${PORT}`);
+  throw new Error(`Chrome CDP not reachable on port ${port}`);
+}
+
+async function closeChromeProfile(
+  client: { Browser: { close(): Promise<unknown> } },
+  port: number
+): Promise<void> {
+  try {
+    await client.Browser.close();
+  } catch {
+    /* Chrome may already have exited */
+  }
+  for (let i = 0; i < 20; i++) {
+    if (!(await cdpReachable(port))) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 
 function toHeader(cookies: Array<{ name: string; value: string; domain?: string }>): {
@@ -142,72 +190,95 @@ function toHeader(cookies: Array<{ name: string; value: string; domain?: string 
 
 export async function syncCookiesFromChrome(): Promise<CookieJar[]> {
   await mkdir(cookiesDir, { recursive: true });
-  await ensureChromeDebugging();
-
-  const client = await CDP({ port: PORT });
-  try {
-    const { Network, Storage, Page } = client;
-    await Network.enable();
-    try {
-      await Page.enable();
-      await Page.navigate({ url: "https://www.magnific.com/" });
-      await new Promise((r) => setTimeout(r, 2500));
-    } catch {
-      /* optional */
-    }
-
-    let cookies: Array<{ name: string; value: string; domain?: string }> = [];
-    try {
-      const all = await Storage.getCookies({});
-      cookies = all.cookies || [];
-    } catch {
-      const net = await Network.getAllCookies();
-      cookies = net.cookies || [];
-    }
-
-    const { header, count } = toHeader(cookies);
-    if (!count) {
-      throw new Error(
-        "No Magnific/Freepik cookies found. Log into magnific.com, then click Connect Magnific again"
-      );
-    }
-
-    let email = "";
-    try {
-      const local = JSON.parse(
-        await readFile(
-          join(process.env.LOCALAPPDATA || "", "Google/Chrome/User Data/Local State"),
-          "utf8"
-        )
-      ) as { profile?: { info_cache?: Record<string, { user_name?: string }> } };
-      email = local.profile?.info_cache?.Default?.user_name || "";
-    } catch {
-      /* ignore */
-    }
-
-    const jar: CookieJar = {
-      id: "chrome-default",
-      profile: "Default",
-      browser: "chrome",
-      label: email ? `chrome ${email.split("@")[0]} (Default)` : "chrome Default",
-      email,
-      cookie: header,
-      updatedAt: new Date().toISOString(),
-      cookieCount: count,
-    };
-
-    await writeFile(join(cookiesDir, `${jar.id}.json`), JSON.stringify(jar, null, 2), "utf8");
-    await writeFile(
-      join(cookiesDir, "active.json"),
-      JSON.stringify({ activeId: jar.id, updatedAt: jar.updatedAt }, null, 2),
-      "utf8"
+  if (chromeRunning()) {
+    throw new Error(
+      "Chrome is running. Close Chrome yourself before fallback CDP sync; extension auto-sync avoids this."
     );
-    console.log(`OK ${jar.label} — ${jar.cookieCount} cookies -> ${jar.id}.json`);
-    console.log("Add more jars later as server/cookies/<id>.json ; set active.json activeId");
-    return [jar];
-  } finally {
-    await client.close();
   }
+
+  const profiles = await readChromeProfiles();
+  if (!profiles.length) throw new Error("No Chrome profiles found");
+  syncProfileCopy(profiles);
+
+  const jars: CookieJar[] = [];
+  for (const profile of profiles) {
+    const port = await freePort();
+    let client: Awaited<ReturnType<typeof CDP>> | undefined;
+    try {
+      await launchChromeProfile(profile, port);
+      client = await CDP({ port });
+      const { Network, Storage, Page } = client;
+      await Network.enable();
+      try {
+        await Page.enable();
+        await Page.navigate({ url: "https://www.magnific.com/" });
+        await new Promise((r) => setTimeout(r, 2500));
+      } catch {
+        /* optional */
+      }
+
+      let cookies: Array<{ name: string; value: string; domain?: string }> = [];
+      try {
+        const all = await Storage.getCookies({});
+        cookies = all.cookies || [];
+      } catch {
+        const net = await Network.getAllCookies();
+        cookies = net.cookies || [];
+      }
+
+      const { header, count } = toHeader(cookies);
+      if (!count) {
+        console.warn(`No Magnific cookies in Chrome profile ${profile.directory}`);
+        continue;
+      }
+
+      const id = `${CHROME_PROFILE_ID_PREFIX}${profile.directory.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+      const jar: CookieJar = {
+        id,
+        profile: profile.directory,
+        browser: "chrome",
+        label: profile.email
+          ? `chrome ${profile.email.split("@")[0]} (${profile.name || profile.directory})`
+          : `chrome ${profile.name || profile.directory}`,
+        email: profile.email,
+        cookie: header,
+        updatedAt: new Date().toISOString(),
+        cookieCount: count,
+      };
+      jars.push(jar);
+      await writeFile(join(cookiesDir, `${jar.id}.json`), JSON.stringify(jar, null, 2), "utf8");
+      console.log(`OK ${jar.label} — ${jar.cookieCount} cookies -> ${jar.id}.json`);
+    } finally {
+      if (client) {
+        await closeChromeProfile(
+          client as unknown as { Browser: { close(): Promise<unknown> } },
+          port
+        );
+        await client.close();
+      }
+    }
+  }
+
+  if (!jars.length) {
+    throw new Error("No Magnific/Freepik cookies found in any Chrome profile");
+  }
+  const currentFiles = (await readdir(cookiesDir)).filter(
+    (file) => file.startsWith(CHROME_PROFILE_ID_PREFIX) && file.endsWith(".json")
+  );
+  const keep = new Set(jars.map((jar) => `${jar.id}.json`));
+  await Promise.all(
+    currentFiles
+      .filter((file) => !keep.has(file))
+      .map((file) => unlink(join(cookiesDir, file)))
+  );
+  const updatedAt = new Date().toISOString();
+  await writeFile(
+    join(cookiesDir, "active.json"),
+    JSON.stringify({ activeId: jars[0].id, updatedAt }, null, 2),
+    "utf8"
+  );
+  console.log(`Synced ${jars.length} Chrome profile(s)`);
+  return jars;
 }
 
 export async function saveCookieJar(jar: CookieJar, makeActive = true): Promise<CookieJar> {

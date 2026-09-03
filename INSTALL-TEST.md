@@ -7,10 +7,10 @@
 3. Bỏ qua bước này khi test bản EXE.
 
 4. Designer mở `MagnificStock.exe`. Kiểm tra icon app xuất hiện ở system tray.
-5. Đăng nhập `magnific.com` trên Chrome.
+5. Đăng nhập `magnific.com` trên một hoặc nhiều Chrome profile.
 6. Mở Figma → chạy plugin → **Settings → Show advanced settings → Connect Magnific**.
 7. Đóng Chrome khi app yêu cầu; chờ trạng thái **Magnific connected**.
-8. Mở lại Chrome.
+8. Mở lại Chrome. Tất cả profile có cookie Magnific được nhập.
 9. Mở `http://localhost:8787/health`. Cookie được lưu tại `%LOCALAPPDATA%\MagnificStock\cookies` trên máy designer. Kiểm tra JSON có:
    - `"hasCookie": true`
    - `"cookieJars": 1` hoặc lớn hơn
@@ -53,6 +53,7 @@
 ## Lỗi thường gặp
 
 - `Proxy unreachable`: chạy `dist\MagnificStock.exe`.
-- Không có cookie: mở `magnific.com`, đăng nhập, bấm **Connect Magnific**, rồi đóng Chrome khi được yêu cầu.
+- Không có cookie: mở `magnific.com` trong profile cần dùng, đăng nhập, bấm **Connect Magnific**, rồi đóng Chrome khi được yêu cầu.
 - Không sync được: đóng toàn bộ Chrome trước khi bấm **Connect Magnific** lần nữa.
+- Nhiều profile: mỗi profile phải từng mở `magnific.com` và đăng nhập; app sẽ bỏ qua profile không có cookie Magnific.
 - Không cần cài Chrome extension cho luồng bình thường.

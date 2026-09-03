@@ -41953,8 +41953,8 @@ var createAdaptorServer = (options) => {
     overrideGlobalObjects: options.overrideGlobalObjects,
     autoCleanupIncoming: options.autoCleanupIncoming
   });
-  const createServer = options.createServer || import_http.createServer;
-  const server = createServer(options.serverOptions || {}, requestListener);
+  const createServer2 = options.createServer || import_http.createServer;
+  const server = createServer2(options.serverOptions || {}, requestListener);
   return server;
 };
 var serve = (options, listeningListener) => {
@@ -44693,6 +44693,7 @@ var import_promises2 = require("node:fs/promises");
 var import_node_fs2 = require("node:fs");
 var import_node_path3 = require("node:path");
 var import_node_child_process2 = require("node:child_process");
+var import_node_net = require("node:net");
 var import_chrome_remote_interface = __toESM(require_chrome_remote_interface(), 1);
 
 // server/runtime-path.ts
@@ -44709,8 +44710,9 @@ function appDataPath(...parts) {
 
 // server/sync-cookies.ts
 var cookiesDir = appDataPath("cookies");
-var PORT = Number(process.env.CHROME_CDP_PORT || 9222);
 var CDP_USER_DATA = (0, import_node_path3.join)(process.env.LOCALAPPDATA || "", "MagnificPluginChromeCDP");
+var CHROME_PROFILE_ID_PREFIX = "chrome-";
+var CHROME_USER_DATA = (0, import_node_path3.join)(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
 var HOST_FILTER = /magnific\.com|freepik\.com|flaticon\.com/i;
 function chromePath() {
   const candidates = [
@@ -44732,55 +44734,77 @@ function chromeRunning() {
     return false;
   }
 }
-async function cdpReachable() {
+async function cdpReachable(port) {
   try {
-    const res = await fetch(`http://127.0.0.1:${PORT}/json/version`);
+    const res = await fetch(`http://127.0.0.1:${port}/json/version`);
     return res.ok;
   } catch {
     return false;
   }
 }
-function syncProfileCopy() {
-  const srcRoot = (0, import_node_path3.join)(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
-  const srcDefault = (0, import_node_path3.join)(srcRoot, "Default");
-  if (!(0, import_node_fs2.existsSync)(srcDefault)) throw new Error("Chrome Default profile not found");
-  (0, import_node_fs2.mkdirSync)(CDP_USER_DATA, { recursive: true });
-  const dstDefault = (0, import_node_path3.join)(CDP_USER_DATA, "Default");
+async function freePort() {
+  return new Promise((resolve, reject) => {
+    const server = (0, import_node_net.createServer)();
+    server.once("error", reject);
+    server.listen(0, "127.0.0.1", () => {
+      const address = server.address();
+      const port = typeof address === "object" && address ? address.port : 0;
+      server.close((err) => err ? reject(err) : resolve(port));
+    });
+  });
+}
+async function readChromeProfiles() {
+  const localStatePath = (0, import_node_path3.join)(CHROME_USER_DATA, "Local State");
+  if (!(0, import_node_fs2.existsSync)(localStatePath)) throw new Error("Chrome User Data not found");
+  const profiles = /* @__PURE__ */ new Map();
   try {
-    (0, import_node_child_process2.execSync)(
-      `robocopy "${srcDefault}" "${dstDefault}" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /XD Cache "Code Cache" GPUCache "Service Worker" "DawnCache" "GrShaderCache" "ShaderCache"`,
-      { stdio: "ignore" }
-    );
-  } catch (err) {
-    const status = err.status ?? 1;
-    if (status >= 8) throw err;
+    const local = JSON.parse(await (0, import_promises2.readFile)(localStatePath, "utf8"));
+    for (const [directory, info] of Object.entries(local.profile?.info_cache || {})) {
+      if (directory === "Default" || /^Profile \d+$/.test(directory)) {
+        profiles.set(directory, { directory, email: info.user_name, name: info.name });
+      }
+    }
+  } catch {
+  }
+  const names = await (0, import_promises2.readdir)(CHROME_USER_DATA, { withFileTypes: true });
+  for (const entry of names) {
+    if (entry.isDirectory() && (entry.name === "Default" || /^Profile \d+$/.test(entry.name)) && !profiles.has(entry.name)) {
+      profiles.set(entry.name, { directory: entry.name });
+    }
+  }
+  return [...profiles.values()].sort((a, b) => a.directory.localeCompare(b.directory));
+}
+function syncProfileCopy(profiles) {
+  (0, import_node_fs2.mkdirSync)(CDP_USER_DATA, { recursive: true });
+  for (const { directory } of profiles) {
+    const srcProfile = (0, import_node_path3.join)(CHROME_USER_DATA, directory);
+    const dstProfile = (0, import_node_path3.join)(CDP_USER_DATA, directory);
+    try {
+      (0, import_node_child_process2.execSync)(
+        `robocopy "${srcProfile}" "${dstProfile}" /MIR /R:1 /W:1 /NFL /NDL /NJH /NJS /XD Cache "Code Cache" GPUCache "Service Worker" "DawnCache" "GrShaderCache" "ShaderCache"`,
+        { stdio: "ignore" }
+      );
+    } catch (err) {
+      const status = err.status ?? 1;
+      if (status >= 8) throw err;
+    }
   }
   for (const name of ["Local State", "Local State.bak"]) {
-    const s = (0, import_node_path3.join)(srcRoot, name);
-    if ((0, import_node_fs2.existsSync)(s)) {
-      (0, import_node_child_process2.execSync)(`cmd /c copy /Y "${s}" "${(0, import_node_path3.join)(CDP_USER_DATA, name)}"`, { stdio: "ignore" });
+    const source = (0, import_node_path3.join)(CHROME_USER_DATA, name);
+    if ((0, import_node_fs2.existsSync)(source)) {
+      (0, import_node_child_process2.execSync)(`cmd /c copy /Y "${source}" "${(0, import_node_path3.join)(CDP_USER_DATA, name)}"`, { stdio: "ignore" });
     }
   }
 }
-async function ensureChromeDebugging() {
-  if (await cdpReachable()) {
-    return;
-  }
-  console.log("Preparing Chrome CDP profile copy...");
-  if (chromeRunning()) {
-    throw new Error(
-      "Chrome is running. Close Chrome yourself before fallback CDP sync; extension auto-sync avoids this."
-    );
-  }
-  syncProfileCopy();
-  console.log(`Starting Chrome CDP on port ${PORT}...`);
+async function launchChromeProfile(profile, port) {
+  console.log(`Starting Chrome CDP for ${profile.directory} on port ${port}...`);
   (0, import_node_child_process2.spawn)(
     chromePath(),
     [
-      `--remote-debugging-port=${PORT}`,
-      `--remote-allow-origins=*`,
+      `--remote-debugging-port=${port}`,
+      "--remote-allow-origins=*",
       `--user-data-dir=${CDP_USER_DATA}`,
-      "--profile-directory=Default",
+      `--profile-directory=${profile.directory}`,
       "--no-first-run",
       "--no-default-browser-check",
       "https://www.magnific.com/"
@@ -44789,13 +44813,22 @@ async function ensureChromeDebugging() {
   ).unref();
   for (let i = 0; i < 60; i++) {
     await new Promise((r) => setTimeout(r, 500));
-    if (await cdpReachable()) {
-      console.log("CDP ready");
+    if (await cdpReachable(port)) {
       await new Promise((r) => setTimeout(r, 2e3));
       return;
     }
   }
-  throw new Error(`Chrome CDP not reachable on port ${PORT}`);
+  throw new Error(`Chrome CDP not reachable on port ${port}`);
+}
+async function closeChromeProfile(client, port) {
+  try {
+    await client.Browser.close();
+  } catch {
+  }
+  for (let i = 0; i < 20; i++) {
+    if (!await cdpReachable(port)) return;
+    await new Promise((r) => setTimeout(r, 250));
+  }
 }
 function toHeader(cookies) {
   const map = /* @__PURE__ */ new Map();
@@ -44810,64 +44843,84 @@ function toHeader(cookies) {
 }
 async function syncCookiesFromChrome() {
   await (0, import_promises2.mkdir)(cookiesDir, { recursive: true });
-  await ensureChromeDebugging();
-  const client = await (0, import_chrome_remote_interface.default)({ port: PORT });
-  try {
-    const { Network, Storage, Page } = client;
-    await Network.enable();
-    try {
-      await Page.enable();
-      await Page.navigate({ url: "https://www.magnific.com/" });
-      await new Promise((r) => setTimeout(r, 2500));
-    } catch {
-    }
-    let cookies = [];
-    try {
-      const all = await Storage.getCookies({});
-      cookies = all.cookies || [];
-    } catch {
-      const net = await Network.getAllCookies();
-      cookies = net.cookies || [];
-    }
-    const { header, count } = toHeader(cookies);
-    if (!count) {
-      throw new Error(
-        "No Magnific/Freepik cookies found. Log into magnific.com, then click Connect Magnific again"
-      );
-    }
-    let email = "";
-    try {
-      const local = JSON.parse(
-        await (0, import_promises2.readFile)(
-          (0, import_node_path3.join)(process.env.LOCALAPPDATA || "", "Google/Chrome/User Data/Local State"),
-          "utf8"
-        )
-      );
-      email = local.profile?.info_cache?.Default?.user_name || "";
-    } catch {
-    }
-    const jar = {
-      id: "chrome-default",
-      profile: "Default",
-      browser: "chrome",
-      label: email ? `chrome ${email.split("@")[0]} (Default)` : "chrome Default",
-      email,
-      cookie: header,
-      updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
-      cookieCount: count
-    };
-    await (0, import_promises2.writeFile)((0, import_node_path3.join)(cookiesDir, `${jar.id}.json`), JSON.stringify(jar, null, 2), "utf8");
-    await (0, import_promises2.writeFile)(
-      (0, import_node_path3.join)(cookiesDir, "active.json"),
-      JSON.stringify({ activeId: jar.id, updatedAt: jar.updatedAt }, null, 2),
-      "utf8"
+  if (chromeRunning()) {
+    throw new Error(
+      "Chrome is running. Close Chrome yourself before fallback CDP sync; extension auto-sync avoids this."
     );
-    console.log(`OK ${jar.label} \u2014 ${jar.cookieCount} cookies -> ${jar.id}.json`);
-    console.log("Add more jars later as server/cookies/<id>.json ; set active.json activeId");
-    return [jar];
-  } finally {
-    await client.close();
   }
+  const profiles = await readChromeProfiles();
+  if (!profiles.length) throw new Error("No Chrome profiles found");
+  syncProfileCopy(profiles);
+  const jars = [];
+  for (const profile of profiles) {
+    const port = await freePort();
+    let client;
+    try {
+      await launchChromeProfile(profile, port);
+      client = await (0, import_chrome_remote_interface.default)({ port });
+      const { Network, Storage, Page } = client;
+      await Network.enable();
+      try {
+        await Page.enable();
+        await Page.navigate({ url: "https://www.magnific.com/" });
+        await new Promise((r) => setTimeout(r, 2500));
+      } catch {
+      }
+      let cookies = [];
+      try {
+        const all = await Storage.getCookies({});
+        cookies = all.cookies || [];
+      } catch {
+        const net = await Network.getAllCookies();
+        cookies = net.cookies || [];
+      }
+      const { header, count } = toHeader(cookies);
+      if (!count) {
+        console.warn(`No Magnific cookies in Chrome profile ${profile.directory}`);
+        continue;
+      }
+      const id = `${CHROME_PROFILE_ID_PREFIX}${profile.directory.toLowerCase().replace(/[^a-z0-9]+/g, "-")}`;
+      const jar = {
+        id,
+        profile: profile.directory,
+        browser: "chrome",
+        label: profile.email ? `chrome ${profile.email.split("@")[0]} (${profile.name || profile.directory})` : `chrome ${profile.name || profile.directory}`,
+        email: profile.email,
+        cookie: header,
+        updatedAt: (/* @__PURE__ */ new Date()).toISOString(),
+        cookieCount: count
+      };
+      jars.push(jar);
+      await (0, import_promises2.writeFile)((0, import_node_path3.join)(cookiesDir, `${jar.id}.json`), JSON.stringify(jar, null, 2), "utf8");
+      console.log(`OK ${jar.label} \u2014 ${jar.cookieCount} cookies -> ${jar.id}.json`);
+    } finally {
+      if (client) {
+        await closeChromeProfile(
+          client,
+          port
+        );
+        await client.close();
+      }
+    }
+  }
+  if (!jars.length) {
+    throw new Error("No Magnific/Freepik cookies found in any Chrome profile");
+  }
+  const currentFiles = (await (0, import_promises2.readdir)(cookiesDir)).filter(
+    (file) => file.startsWith(CHROME_PROFILE_ID_PREFIX) && file.endsWith(".json")
+  );
+  const keep = new Set(jars.map((jar) => `${jar.id}.json`));
+  await Promise.all(
+    currentFiles.filter((file) => !keep.has(file)).map((file) => (0, import_promises2.unlink)((0, import_node_path3.join)(cookiesDir, file)))
+  );
+  const updatedAt = (/* @__PURE__ */ new Date()).toISOString();
+  await (0, import_promises2.writeFile)(
+    (0, import_node_path3.join)(cookiesDir, "active.json"),
+    JSON.stringify({ activeId: jars[0].id, updatedAt }, null, 2),
+    "utf8"
+  );
+  console.log(`Synced ${jars.length} Chrome profile(s)`);
+  return jars;
 }
 async function saveCookieJar(jar, makeActive = true) {
   if (!jar?.id || !jar?.cookie?.trim()) {
@@ -45146,7 +45199,7 @@ function getJob(id) {
 }
 
 // server/index.ts
-var PORT2 = Number(process.env.PORT || 8787);
+var PORT = Number(process.env.PORT || 8787);
 var AUTO_SYNC = process.env.COOKIES_AUTO_SYNC === "1";
 var PRUNE_INTERVAL_MS = 60 * 60 * 1e3;
 var SEARCH_CACHE_TTL_MS = 45e3;
@@ -45490,7 +45543,7 @@ function handleError(c, err) {
 }
 async function boot() {
   const jars = await loadCookieJars();
-  console.log(`Magnific proxy (no API key) on http://localhost:${PORT2}`);
+  console.log(`Magnific proxy (no API key) on http://localhost:${PORT}`);
   console.log(
     "Local convert: package SVG/EPS/ZIP \xB7 EPS\u2192SVG via gs+pdftocairo (Inkscape/mutool fallback) \xB7 no trace"
   );
@@ -45518,6 +45571,6 @@ async function boot() {
       console.warn("Auto cookie sync failed:", err instanceof Error ? err.message : err);
     }
   }
-  serve({ fetch: app.fetch, port: PORT2 });
+  serve({ fetch: app.fetch, port: PORT });
 }
 boot();
