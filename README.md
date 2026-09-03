@@ -2,23 +2,20 @@
 
 Search Magnific from Figma, prefer real SVG, convert EPS → SVG locally, insert onto the canvas.
 
-**No API keys.** Project is internal. Keep repository private. Cookies sync automatically from Chrome into local `server/cookies/`; cookie files never belong in GitHub.
+**No API keys.** Project is internal. Keep repository private. Session cookies stay local in `%LOCALAPPDATA%\MagnificStock\cookies`; never commit or upload them.
 
 ## Designer setup (Windows)
 
-1. Run `setup-windows.ps1` once:
+1. Build release on developer machine with `npm run build:exe`, then distribute `dist/MagnificStock.exe`, `manifest.json`, `dist/code.js`, and `dist/index.html` as one ZIP.
 
-```powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\setup-windows.ps1
-```
+2. Designer imports `manifest.json` once through **Figma Desktop → Plugins → Development → Import plugin from manifest...**.
+3. Designer double-clicks `MagnificStock.exe`; it runs in the system tray and starts local server.
+4. Designer opens Chrome and logs in to `magnific.com`.
+5. Designer runs **Magnific Stock** in Figma.
+6. Open **Settings → Show advanced settings → Connect Magnific**.
+7. Close Chrome when prompted, wait for **Magnific connected**, then reopen Chrome.
 
-2. In Chrome, enable **Developer mode** → **Load unpacked** → select `extension/`.
-3. Sign in to Chrome with the approved Google account.
-4. Open `magnific.com` and log in.
-4. Open Figma and run **Magnific Stock**.
-
-After first setup, server starts with Windows and extension syncs cookies automatically when Magnific is open. Designer needs no terminal, `npm`, Proxy URL, or CDP sync.
+Figma does not expose supported API for EXE to auto-import local plugin manifest. For zero-manual-install distribution, publish plugin as a private organization plugin; designers install it from Figma once. No Chrome extension, terminal, `npm`, Proxy URL, or CDP command needed for designer.
 
 ## Developer quick start
 
@@ -32,12 +29,12 @@ Import `manifest.json` in Figma only for local development. See [`INSTALL-TEST.m
 
 ## Cookies (internal only)
 
-- Cookie jars live in `server/cookies/*.json` and are gitignored.
-- `server/cookies/active.json` is local runtime state and is gitignored.
+- Cookie jars live in `%LOCALAPPDATA%\MagnificStock\cookies\*.json`.
+- Cookie data belongs to each designer's Windows user profile and never enters project files.
 - Never commit, upload, or paste cookie values into issues, chat, logs, or pull requests.
-- Extension checks Chrome Google sign-in first via `chrome.identity`; without sign-in it does not read or send Magnific cookies.
-- Extension sends cookies only to local proxy: `http://localhost:8787/cookies/import`.
-- CDP fallback never force-closes Chrome; close Chrome yourself first.
+- Connect Magnific reads cookies from local Chrome profile through CDP.
+- Cookie data sends only to local proxy: `http://localhost:8787`.
+- CDP sync never force-closes Chrome; designer closes Chrome first.
 - If cookie leaks, log out of Magnific on all devices and rotate the session immediately.
 
 ### Browser extension (Magnific Cookie Sync)

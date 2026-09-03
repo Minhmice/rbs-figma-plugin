@@ -31,20 +31,9 @@ npm.cmd ci
 npm.cmd run build
 New-Item -ItemType Directory -Force -Path (Join-Path $root "server\cookies") | Out-Null
 
-$startup = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\Startup"
-$shortcutPath = Join-Path $startup "RBS Stock Server.lnk"
-$serverLog = Join-Path $root "server.log"
-$command = "/c cd /d `"$root`" && npm.cmd run server > `"$serverLog`" 2>&1"
-$wsh = New-Object -ComObject WScript.Shell
-$shortcut = $wsh.CreateShortcut($shortcutPath)
-$shortcut.TargetPath = $env:ComSpec
-$shortcut.Arguments = $command
-$shortcut.WorkingDirectory = $root
-$shortcut.WindowStyle = 7
-$shortcut.Save()
+Write-Host "Building background app..."
+npm.cmd run build:server
+npx.cmd pkg packaging\server.bundle.cjs --targets node22-win-x64 --output dist\MagnificStock.exe
+node.exe scripts\hide-console.mjs dist\MagnificStock.exe
 
-Start-Process $env:ComSpec -ArgumentList $command -WorkingDirectory $root -WindowStyle Minimized
-Start-Process explorer.exe (Join-Path $root "extension")
-Start-Process "chrome.exe" "chrome://extensions/" -ErrorAction SilentlyContinue
-
-Write-Host "Setup complete. Load extension folder in Chrome once, then open Figma plugin."
+Write-Host "Setup complete. Run dist\MagnificStock.exe, then open Figma plugin."

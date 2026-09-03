@@ -51,7 +51,7 @@ export function SettingsPanel({
         <code>/</code> search, <code>Space</code> select, <code>Enter</code> insert, <code>F</code>{" "}
         favorite, <code>Esc</code> clear.
       </p>
-      <p className="hint">Magnific connection syncs automatically while Magnific is open.</p>
+      <p className="hint">Click Connect Magnific once after logging into magnific.com.</p>
       <p className="hint">{health}</p>
       <button
         type="button"
@@ -72,7 +72,7 @@ export function SettingsPanel({
             />
           </label>
           <button type="button" className="ghost" onClick={onSyncCookies} disabled={syncing}>
-            {syncing ? "Syncing…" : "Fallback: sync Chrome cookies (CDP)"}
+            {syncing ? "Connecting…" : "Connect Magnific"}
           </button>
         </div>
       ) : null}

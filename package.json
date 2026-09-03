@@ -14,6 +14,9 @@
     "dev:ui": "vite build --watch",
     "server": "tsx watch server/index.ts",
     "cookies:sync": "tsx server/sync-cookies.ts",
+    "build:server": "esbuild server/index.ts --bundle --platform=node --target=node22 --format=cjs --outfile=packaging/server.bundle.cjs",
+    "build:exe": "npm run build && npm run build:server && pkg packaging/server.bundle.cjs --targets node22-win-x64 --output dist/MagnificStock.exe && node scripts/hide-console.mjs dist/MagnificStock.exe",
+    "test:server": "node --check packaging/server.bundle.cjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix"
   },
@@ -33,6 +36,7 @@
     "@types/react": "^19.1.6",
     "@types/react-dom": "^19.1.5",
     "@vitejs/plugin-react": "^4.5.0",
+    "@yao-pkg/pkg": "^6.22.0",
     "concurrently": "^10.0.5",
     "esbuild": "^0.25.5",
     "eslint": "^9.39.4",

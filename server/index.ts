@@ -144,11 +144,11 @@ function friendlyAuthError(err: unknown): Error {
   if (status === 403 || /403|premium|forbidden/i.test(message)) {
     return new HttpError(
       403,
-      "Premium / login required — use a logged-in cookie jar (extension → Send to proxy)"
+      "Premium / login required — open magnific.com, then click Connect Magnific"
     );
   }
   if (status === 401 || /401|unauthorized/i.test(message)) {
-    return new HttpError(401, "Cookie expired — Collect again in the Magnific Cookie Sync extension");
+    return new HttpError(401, "Cookie expired — open magnific.com, then click Connect Magnific");
   }
   return err instanceof Error ? err : new Error(message);
 }
@@ -455,9 +455,9 @@ async function boot() {
     "Local convert: package SVG/EPS/ZIP · EPS→SVG via gs+pdftocairo (Inkscape/mutool fallback) · no trace"
   );
   if (jars.length) {
-    console.log(`Cookie jars: ${jars.length} loaded from server/cookies/`);
+    console.log(`Cookie jars: ${jars.length} loaded from local app data`);
   } else {
-    console.warn("No cookie jars — open magnific.com with Cookie Sync extension, or use fallback: npm run cookies:sync");
+    console.warn("No cookie jars — open magnific.com, then click Connect Magnific in Figma Settings");
   }
   try {
     const removed = await pruneExpired();

@@ -3,8 +3,8 @@
  */
 import { mkdir, readFile, writeFile, unlink, readdir } from "node:fs/promises";
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
+import { appDataPath } from "./runtime-path.js";
 import type {
   AssetItem,
   AssetKind,
@@ -12,8 +12,7 @@ import type {
   SearchResponse,
 } from "../src/shared/messages.js";
 
-const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const recentDir = join(rootDir, "server", "recent");
+export const recentDir = appDataPath("recent");
 const filesDir = join(recentDir, "files");
 const indexPath = join(recentDir, "index.json");
 

@@ -174,7 +174,7 @@ export function App() {
       const h = await checkHealth(base);
       setCookieStale(Boolean(h.cookieStale));
       if (!h.hasCookie) {
-        setHealth("Proxy up — no cookies. Use Magnific Cookie Sync extension → Send to proxy");
+        setHealth("Proxy up — no cookies. Click Connect Magnific below");
       } else {
         const exp =
           h.cookieExpiresAt != null
@@ -189,7 +189,7 @@ export function App() {
       }
     } catch {
       setCookieStale(false);
-      setHealth("Proxy unreachable — run `npm run server`");
+      setHealth("Proxy unreachable — start MagnificStock.exe");
     }
   }, []);
 
@@ -662,12 +662,12 @@ export function App() {
               void (async () => {
                 setSyncingCookies(true);
                 setTone("loading");
-                setStatus("Syncing Chrome cookies (CDP)…");
+                setStatus("Connecting Magnific — close Chrome if requested…");
                 try {
                   await syncCookies(proxyUrl);
                   await refreshHealth(proxyUrl);
                   setTone("success");
-                  setStatus("Chrome cookies synced");
+                  setStatus("Magnific connected");
                 } catch (err) {
                   const message = err instanceof Error ? err.message : String(err);
                   setTone("error");

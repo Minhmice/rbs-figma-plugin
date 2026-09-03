@@ -4,13 +4,12 @@
  */
 import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { existsSync, mkdirSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { spawn, execSync } from "node:child_process";
 import CDP from "chrome-remote-interface";
+import { appDataPath } from "./runtime-path.js";
 
-const rootDir = join(dirname(fileURLToPath(import.meta.url)), "..");
-export const cookiesDir = join(rootDir, "server", "cookies");
+export const cookiesDir = appDataPath("cookies");
 const PORT = Number(process.env.CHROME_CDP_PORT || 9222);
 const CDP_USER_DATA = join(process.env.LOCALAPPDATA || "", "MagnificPluginChromeCDP");
 const HOST_FILTER = /magnific\.com|freepik\.com|flaticon\.com/i;
@@ -169,7 +168,7 @@ export async function syncCookiesFromChrome(): Promise<CookieJar[]> {
     const { header, count } = toHeader(cookies);
     if (!count) {
       throw new Error(
-        "No Magnific/Freepik cookies found. Log into magnific.com in the CDP Chrome window, then re-run npm run cookies:sync"
+        "No Magnific/Freepik cookies found. Log into magnific.com, then click Connect Magnific again"
       );
     }
 
