@@ -10,6 +10,15 @@ function setStatus(text) {
   statusEl.textContent = text;
 }
 
+async function showGoogleStatus() {
+  const res = await send({ type: "get-status" });
+  if (res.ok) {
+    setStatus(`Google signed in: ${res.email}\nAuto-sync ready.`);
+  } else {
+    setStatus(`Google sign-in required.\n${res.error}`);
+  }
+}
+
 function send(msg) {
   return new Promise((resolve) => {
     chrome.runtime.sendMessage(msg, (res) => {
@@ -93,3 +102,4 @@ downloadBtn.addEventListener("click", async () => {
 });
 
 loadSettings();
+showGoogleStatus();

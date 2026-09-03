@@ -7,7 +7,7 @@ Internal-only extension. Exports Magnific / Freepik / Flaticon cookies into the 
 1. Open `chrome://extensions` (or `edge://extensions`)
 2. Enable **Developer mode**
 3. **Load unpacked** → choose this `extension/` folder
-4. Keep [magnific.com](https://www.magnific.com/) open and logged in
+4. Sign in to Chrome with the approved Google account, then keep [magnific.com](https://www.magnific.com/) open and logged in
 
 ## Use
 

@@ -14,7 +14,8 @@ Set-ExecutionPolicy -Scope Process Bypass
 ```
 
 2. In Chrome, enable **Developer mode** → **Load unpacked** → select `extension/`.
-3. Open `magnific.com` and log in.
+3. Sign in to Chrome with the approved Google account.
+4. Open `magnific.com` and log in.
 4. Open Figma and run **Magnific Stock**.
 
 After first setup, server starts with Windows and extension syncs cookies automatically when Magnific is open. Designer needs no terminal, `npm`, Proxy URL, or CDP sync.
@@ -34,7 +35,9 @@ Import `manifest.json` in Figma only for local development. See [`INSTALL-TEST.m
 - Cookie jars live in `server/cookies/*.json` and are gitignored.
 - `server/cookies/active.json` is local runtime state and is gitignored.
 - Never commit, upload, or paste cookie values into issues, chat, logs, or pull requests.
+- Extension checks Chrome Google sign-in first via `chrome.identity`; without sign-in it does not read or send Magnific cookies.
 - Extension sends cookies only to local proxy: `http://localhost:8787/cookies/import`.
+- CDP fallback never force-closes Chrome; close Chrome yourself first.
 - If cookie leaks, log out of Magnific on all devices and rotate the session immediately.
 
 ### Browser extension (Magnific Cookie Sync)

@@ -18,17 +18,36 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (changeInfo.status === "complete") void syncIfMagnificOpen();
 });
 
+chrome.identity.onSignInChanged.addListener(() => {
+  void syncIfMagnificOpen();
+});
+
+async function getGoogleProfile() {
+  const profile = await chrome.identity.getProfileUserInfo({ accountStatus: "ANY" });
+  if (!profile.id || !profile.email) {
+    throw new Error("Sign in to Chrome with Google before syncing Magnific cookies.");
+  }
+  return profile;
+}
+
 async function syncIfMagnificOpen() {
   const tabs = await chrome.tabs.query({ url: ["*://*.magnific.com/*", "*://*.freepik.com/*"] });
   if (!tabs.length) return;
   try {
+    await getGoogleProfile();
     await pushJar();
   } catch {
-    // Login may be incomplete or proxy may be offline; next event retries.
+    // Google sign-in, Magnific login, or proxy may be unavailable; next event retries.
   }
 }
 
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
+  if (msg?.type === "get-status") {
+    getGoogleProfile()
+      .then((profile) => sendResponse({ ok: true, email: profile.email }))
+      .catch((err) => sendResponse({ ok: false, error: String(err?.message || err) }));
+    return true;
+  }
   if (msg?.type === "collect-cookies") {
     collectJar()
       .then((jar) => sendResponse({ ok: true, jar }))
@@ -76,6 +95,7 @@ function guessEmail(cookieHeader) {
 }
 
 async function collectJar() {
+  const googleProfile = await getGoogleProfile();
   const cookies = await getAllRelevantCookies();
   if (!cookies.length) {
     throw new Error(
@@ -88,8 +108,8 @@ async function collectJar() {
     id: JAR_ID,
     profile: "extension",
     browser: "chrome",
-    label: email ? `extension ${email.split("@")[0]}` : "extension Magnific",
-    email: email || undefined,
+    label: `Google ${googleProfile.email}`,
+    email: email || googleProfile.email,
     cookie,
     updatedAt: new Date().toISOString(),
     cookieCount: cookie.split(";").filter((s) => s.trim()).length,
@@ -97,7 +117,7 @@ async function collectJar() {
   return jar;
 }
 
-async async function pushJar(proxyUrl = DEFAULT_PROXY) {
+async function pushJar(proxyUrl = DEFAULT_PROXY) {
   const jar = await collectJar();
   const base = String(proxyUrl || DEFAULT_PROXY).replace(/\/$/, "");
   const res = await fetch(`${base}/cookies/import`, {

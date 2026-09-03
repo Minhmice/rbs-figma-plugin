@@ -57,14 +57,6 @@ async function cdpReachable(): Promise<boolean> {
   }
 }
 
-function killChrome(): void {
-  try {
-    execSync("taskkill /F /IM chrome.exe /T", { stdio: "ignore" });
-  } catch {
-    /* ignore */
-  }
-}
-
 function syncProfileCopy(): void {
   const srcRoot = join(process.env.LOCALAPPDATA || "", "Google", "Chrome", "User Data");
   const srcDefault = join(srcRoot, "Default");
@@ -100,9 +92,9 @@ async function ensureChromeDebugging(): Promise<void> {
 
   console.log("Preparing Chrome CDP profile copy...");
   if (chromeRunning()) {
-    console.log("Closing Chrome to copy cookies DB...");
-    killChrome();
-    await new Promise((r) => setTimeout(r, 2000));
+    throw new Error(
+      "Chrome is running. Close Chrome yourself before fallback CDP sync; extension auto-sync avoids this."
+    );
   }
 
   syncProfileCopy();
