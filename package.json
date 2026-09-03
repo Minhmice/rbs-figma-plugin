@@ -5,6 +5,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "setup:windows": "powershell -ExecutionPolicy Bypass -File .\\setup-windows.ps1",
     "build": "npm run build:code && npm run build:ui",
     "build:code": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2017 --format=iife",
     "build:ui": "vite build",

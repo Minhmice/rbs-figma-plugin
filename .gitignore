@@ -7,8 +7,13 @@ out/
 dist/
 .env
 server/.env
+# Local authentication/session data — never commit
 server/cookies/*.json
+server/cookies/**
 !server/cookies/.gitkeep
+
+# Local setup/runtime output
+server.log
 server/recent/index.json
 server/recent/files/*
 !server/recent/files/.gitkeep

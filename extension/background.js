@@ -5,6 +5,29 @@ const HOST_FILTER = /magnific\.com$|freepik\.com$|flaticon\.com$/i;
 const DEFAULT_PROXY = "http://localhost:8787";
 const JAR_ID = "browser-extension";
 
+chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create("sync-cookies", { periodInMinutes: 15 });
+  void syncIfMagnificOpen();
+});
+
+chrome.alarms.onAlarm.addListener((alarm) => {
+  if (alarm.name === "sync-cookies") void syncIfMagnificOpen();
+});
+
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.status === "complete") void syncIfMagnificOpen();
+});
+
+async function syncIfMagnificOpen() {
+  const tabs = await chrome.tabs.query({ url: ["*://*.magnific.com/*", "*://*.freepik.com/*"] });
+  if (!tabs.length) return;
+  try {
+    await pushJar();
+  } catch {
+    // Login may be incomplete or proxy may be offline; next event retries.
+  }
+}
+
 chrome.runtime.onMessage.addListener((msg, _sender, sendResponse) => {
   if (msg?.type === "collect-cookies") {
     collectJar()
@@ -74,7 +97,7 @@ async function collectJar() {
   return jar;
 }
 
-async function pushJar(proxyUrl) {
+async async function pushJar(proxyUrl = DEFAULT_PROXY) {
   const jar = await collectJar();
   const base = String(proxyUrl || DEFAULT_PROXY).replace(/\/$/, "");
   const res = await fetch(`${base}/cookies/import`, {

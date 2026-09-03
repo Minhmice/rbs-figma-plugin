@@ -457,7 +457,7 @@ async function boot() {
   if (jars.length) {
     console.log(`Cookie jars: ${jars.length} loaded from server/cookies/`);
   } else {
-    console.warn("No cookie jars — load extension/ and Send to proxy, or: npm run cookies:sync");
+    console.warn("No cookie jars — open magnific.com with Cookie Sync extension, or use fallback: npm run cookies:sync");
   }
   try {
     const removed = await pruneExpired();

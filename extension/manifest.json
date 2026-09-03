@@ -3,7 +3,7 @@
   "name": "Magnific Cookie Sync",
   "version": "1.0.0",
   "description": "Export Magnific / Freepik cookies into the minhmice-plugin cookie jar format",
-  "permissions": ["cookies", "storage", "downloads"],
+  "permissions": ["cookies", "storage", "downloads", "alarms", "tabs"],
   "host_permissions": [
     "*://*.magnific.com/*",
     "*://*.freepik.com/*",

@@ -1,6 +1,6 @@
-# Magnific Cookie Sync (Chrome / Edge)
+# Magnific Cookie Sync (Internal Chrome / Edge extension)
 
-Exports Magnific / Freepik / Flaticon cookies into the jar format used by `server/cookies/`.
+Internal-only extension. Exports Magnific / Freepik / Flaticon cookies into the local jar format used by `server/cookies/`. Never publish or distribute outside approved team members.
 
 ## Install
 
@@ -11,10 +11,10 @@ Exports Magnific / Freepik / Flaticon cookies into the jar format used by `serve
 
 ## Use
 
-| Button | Action |
-|--------|--------|
-| **Collect** | Read cookies into memory |
-| **Send to proxy** | `POST http://localhost:8787/cookies/import` (writes `server/cookies/browser-extension.json` + sets active) |
-| **Download JSON jar** | Save file manually into `server/cookies/` |
+No button needed. Extension sends cookies to `http://localhost:8787/cookies/import` when a Magnific tab opens or every 15 minutes. Proxy must be running.
 
-Proxy must be running (`npm run server`) for **Send to proxy**.
+Popup buttons remain under **Advanced** for fallback and debugging:
+
+- **Collect**: read cookies into memory
+- **Send to proxy**: manually push cookie jar
+- **Download JSON jar**: manual file export

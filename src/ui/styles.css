@@ -637,6 +637,35 @@ button.ghost.sm {
   gap: 8px;
 }
 
+.settings-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.connection-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--text-tertiary);
+  font-size: 11px;
+}
+
+.connection-state.connected {
+  color: var(--success);
+}
+
+.connection-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--text-tertiary);
+}
+
+.connection-state.connected .connection-dot {
+  background: var(--success);
+}
+
 .settings label {
   display: flex;
   flex-direction: column;
@@ -680,6 +709,21 @@ button.ghost.sm {
 .settings .actions {
   display: flex;
   gap: 6px;
+}
+
+.advanced-settings {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 2px;
+  border-top: 1px solid var(--border);
+}
+
+.text-button {
+  align-self: flex-start;
+  padding: 0;
+  color: var(--text-secondary);
+  text-decoration: underline;
 }
 
 .primary {

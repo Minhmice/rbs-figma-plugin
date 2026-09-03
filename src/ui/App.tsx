@@ -545,7 +545,7 @@ export function App() {
       <div className="top">
         {cookieStale ? (
           <div className="banner warn">
-            Cookie missing or expiring — Magnific Cookie Sync → Collect → Send to proxy
+            Cookie missing or expiring — open magnific.com to reconnect automatically
           </div>
         ) : null}
         <div className="row">
