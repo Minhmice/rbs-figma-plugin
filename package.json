@@ -1,0 +1,44 @@
+{
+  "name": "rbs-figma-plugin",
+  "version": "1.0.0",
+  "description": "Magnific Stock browser for Figma — search, prefer SVG, convert EPS, insert to canvas",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "npm run build:code && npm run build:ui",
+    "build:code": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2017 --format=iife",
+    "build:ui": "vite build",
+    "watch": "npm run build && concurrently -k \"npm:dev:code\" \"npm:dev:ui\"",
+    "dev:code": "esbuild src/code.ts --bundle --outfile=dist/code.js --target=es2017 --format=iife --watch",
+    "dev:ui": "vite build --watch",
+    "server": "tsx watch server/index.ts",
+    "cookies:sync": "tsx server/sync-cookies.ts",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.4",
+    "chrome-remote-interface": "^0.34.0",
+    "hono": "^4.7.10",
+    "jszip": "^3.10.1",
+    "react": "^19.1.0",
+    "react-dom": "^19.1.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.4",
+    "@figma/eslint-plugin-figma-plugins": "*",
+    "@figma/plugin-typings": "^1.135.0",
+    "@types/node": "^26.3.0",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.0",
+    "concurrently": "^10.0.5",
+    "esbuild": "^0.25.5",
+    "eslint": "^9.39.4",
+    "tsx": "^4.19.4",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.57.1",
+    "vite": "^6.3.5",
+    "vite-plugin-singlefile": "^2.2.0"
+  }
+}

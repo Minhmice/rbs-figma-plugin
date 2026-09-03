@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Magnific Cookie Sync",
+  "version": "1.0.0",
+  "description": "Export Magnific / Freepik cookies into the minhmice-plugin cookie jar format",
+  "permissions": ["cookies", "storage", "downloads"],
+  "host_permissions": [
+    "*://*.magnific.com/*",
+    "*://*.freepik.com/*",
+    "*://*.flaticon.com/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Magnific Cookie Sync"
+  },
+  "background": {
+    "service_worker": "background.js"
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

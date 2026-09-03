@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Magnific Cookie Sync</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <h1>Magnific cookies</h1>
+    <p class="sub">Export jar for <code>server/cookies/</code></p>
+
+    <label>
+      Proxy URL
+      <input id="proxy" type="url" placeholder="http://localhost:8787" />
+    </label>
+
+    <div class="row">
+      <button id="collect" type="button">Collect</button>
+      <button id="push" type="button" class="primary">Send to proxy</button>
+    </div>
+    <button id="download" type="button" class="ghost">Download JSON jar</button>
+
+    <pre id="status" class="status">Open magnific.com while logged in, then Collect.</pre>
+
+    <script src="popup.js"></script>
+  </body>
+</html>

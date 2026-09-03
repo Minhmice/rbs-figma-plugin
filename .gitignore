@@ -1,0 +1,22 @@
+# Node
+*.log
+*.log.*
+node_modules
+
+out/
+dist/
+.env
+server/.env
+server/cookies/*.json
+!server/cookies/.gitkeep
+server/recent/index.json
+server/recent/files/*
+!server/recent/files/.gitkeep
+!server/recent/.gitkeep
+
+# OS / editor
+.DS_Store
+*.swp
+.idea/
+.vscode/
+.cursor/

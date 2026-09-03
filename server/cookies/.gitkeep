@@ -1,0 +1,1 @@
+# Cookie jar files are gitignored (secrets). Run: npm run cookies:sync

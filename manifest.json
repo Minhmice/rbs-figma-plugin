@@ -1,0 +1,24 @@
+{
+  "name": "Magnific Stock",
+  "id": "1673958345265936393",
+  "api": "1.0.0",
+  "main": "dist/code.js",
+  "ui": "dist/index.html",
+  "capabilities": [],
+  "enableProposedApi": false,
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma", "figjam"],
+  "networkAccess": {
+    "allowedDomains": [
+      "http://localhost:8787",
+      "https://www.magnific.com",
+      "https://*.magnific.com",
+      "https://www.freepik.com",
+      "https://*.freepik.com",
+      "https://*.cdnpk.net",
+      "https://cdn-icons-png.magnific.com",
+      "https://img.freepik.com"
+    ],
+    "reasoning": "Local convert proxy plus Magnific/Freepik website search and CDN previews. No third-party convert APIs."
+  }
+}
